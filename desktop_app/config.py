@@ -15,6 +15,8 @@ class AppConfig:
     hf_model: str = os.getenv("HF_MODEL", "google/flan-t5-large")
     whisper_model: str = os.getenv("WHISPER_MODEL", "base")
     piper_voice: str = os.getenv("PIPER_VOICE", "en_US-amy-low")
+    voice_record_seconds: int = int(os.getenv("VOICE_RECORD_SECONDS", "5"))
+    voice_sample_rate: int = int(os.getenv("VOICE_SAMPLE_RATE", "16000"))
 
 
 DEFAULT_SYSTEM_PROMPT = (

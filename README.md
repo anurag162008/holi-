@@ -60,6 +60,7 @@ python -m desktop_app
 ### Optional dependencies
 
 - **Whisper (STT)**: install `openai-whisper` and FFmpeg to use local speech-to-text.
+- **Voice recording**: install `sounddevice` + `soundfile` for microphone capture.
 - **Piper (TTS)**: install `piper` and `ffplay` (from FFmpeg) for female voice output.
 - **PyAutoGUI**: install `pyautogui` for mouse/keyboard control.
 

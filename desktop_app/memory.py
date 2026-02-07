@@ -61,6 +61,15 @@ class MemoryStore:
             )
             conn.commit()
 
+    def remember_preference(self, content: str) -> None:
+        self.save_long_term("preference", content)
+
+    def remember_command(self, content: str) -> None:
+        self.save_long_term("command", content)
+
+    def remember_style(self, content: str) -> None:
+        self.save_long_term("style", content)
+
     def fetch_long_term(self, categories: Iterable[str]) -> list[MemoryItem]:
         placeholders = ",".join("?" for _ in categories)
         query = f"SELECT timestamp, category, content FROM memories WHERE category IN ({placeholders})"

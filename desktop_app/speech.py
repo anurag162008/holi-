@@ -4,12 +4,25 @@ import subprocess
 from typing import Any
 
 from desktop_app.config import AppConfig
-from desktop_app.providers import load_module
+from desktop_app.providers import is_module_available, load_module
 
 
 class SpeechEngine:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
+
+    def record_audio(self, output_path: str) -> None:
+        if not is_module_available("sounddevice"):
+            raise RuntimeError("sounddevice is required for voice recording")
+        sounddevice = load_module("sounddevice")
+        soundfile = load_module("soundfile")
+        recording = sounddevice.rec(
+            int(self.config.voice_record_seconds * self.config.voice_sample_rate),
+            samplerate=self.config.voice_sample_rate,
+            channels=1,
+        )
+        sounddevice.wait()
+        soundfile.write(output_path, recording, self.config.voice_sample_rate)
 
     def transcribe(self, audio_path: str) -> str:
         whisper = load_module("whisper")
