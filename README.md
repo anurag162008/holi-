@@ -46,6 +46,55 @@ Open: `http://localhost:8000`
 
 ---
 
+## Desktop app (Windows / Linux)
+
+This repo now ships a lightweight desktop UI that supports voice-ready chat, PC control hooks,
+real-time search, and long-term memory storage.
+
+### Run the desktop app
+
+```bash
+python -m desktop_app
+```
+
+### Optional dependencies
+
+- **Whisper (STT)**: install `openai-whisper` and FFmpeg to use local speech-to-text.
+- **Piper (TTS)**: install `piper` and `ffplay` (from FFmpeg) for female voice output.
+- **PyAutoGUI**: install `pyautogui` for mouse/keyboard control.
+
+### Memory storage
+
+Use the **Select Memory Folder** button in the UI to choose where long-term memory is stored
+(SQLite file inside that folder).
+
+### Provider routing
+
+The desktop app automatically tries providers in this order:
+
+1. Ollama (local)
+2. Gemini API
+3. OpenRouter
+4. Hugging Face Inference
+
+Set environment variables to enable providers:
+
+```bash
+set GEMINI_API_KEY=your_key
+set OPENROUTER_API_KEY=your_key
+set HF_API_KEY=your_key
+```
+
+On Linux/macOS:
+
+```bash
+export GEMINI_API_KEY=your_key
+export OPENROUTER_API_KEY=your_key
+export HF_API_KEY=your_key
+```
+
+---
+
 ## Features
 
 ### Voice + Chat (single app)
