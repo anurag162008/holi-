@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Jarvis Assistant</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        background: #0f172a;
+        color: #e2e8f0;
+        margin: 0;
+        padding: 2rem;
+      }
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+      }
+      .card {
+        background: #1e293b;
+        padding: 1.5rem;
+        border-radius: 16px;
+        margin-bottom: 1rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+      button {
+        background: #38bdf8;
+        border: none;
+        color: #0f172a;
+        padding: 0.6rem 1rem;
+        border-radius: 999px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button.secondary {
+        background: #64748b;
+        color: #e2e8f0;
+      }
+      input, textarea {
+        width: 100%;
+        padding: 0.7rem;
+        border-radius: 12px;
+        border: 1px solid #334155;
+        background: #0f172a;
+        color: #e2e8f0;
+        margin-top: 0.4rem;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+      }
+      .row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+      .log {
+        max-height: 200px;
+        overflow: auto;
+        background: #0f172a;
+        padding: 1rem;
+        border-radius: 12px;
+      }
+      .muted {
+        color: #94a3b8;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Jarvis Assistant</h1>
+      <p class="muted">Voice + chat + stats + weather + search (single app)</p>
+
+      <div class="grid">
+        <div class="card">
+          <h2>System Stats</h2>
+          <button onclick="loadStats()">Refresh</button>
+          <pre id="stats" class="log">Loading...</pre>
+        </div>
+        <div class="card">
+          <h2>Weather</h2>
+          <label>Latitude <input id="lat" value="28.6139" /></label>
+          <label>Longitude <input id="lon" value="77.2090" /></label>
+          <button onclick="loadWeather()">Get Weather</button>
+          <pre id="weather" class="log"></pre>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Search</h2>
+        <input id="query" placeholder="Ask anything..." />
+        <div class="row">
+          <button onclick="search()">Search</button>
+          <button class="secondary" onclick="speakResult()">Speak Result</button>
+        </div>
+        <pre id="search" class="log"></pre>
+      </div>
+
+      <div class="card">
+        <h2>Assistant Persona</h2>
+        <p class="muted">Change the assistant's default prompt (saved locally in your browser).</p>
+        <textarea id="persona" rows="6"></textarea>
+        <div class="row">
+          <button onclick="savePersona()">Save Persona</button>
+          <button class="secondary" onclick="resetPersona()">Reset</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Chat / Voice</h2>
+        <textarea id="chat" rows="4" placeholder="Type a command or question..."></textarea>
+        <div class="row">
+          <button onclick="sendChat()">Send</button>
+          <button class="secondary" onclick="startVoice()">Start Voice</button>
+        </div>
+        <pre id="chatlog" class="log"></pre>
+      </div>
+    </div>
+
+    <script>
+      const chatlog = document.getElementById("chatlog");
+      const searchBox = document.getElementById("search");
+      const personaBox = document.getElementById("persona");
+      const defaultPersona =
+        "You are Divya, my sweet classmate and close friend from 11th grade. You are 17 years old, " +
+        "studying in the same class as me, preparing for JEE just like Anurag ji. You speak in a soft, " +
+        "warm, natural Hindi-English mix – jaise koi kareeb wali ladki school mein baat karti hai, " +
+        "thoda shy, thoda playful, lekin hamesha respectful aur innocent.\\n\\n" +
+        "You are emotionally mature for your age, classy, confident, and a little hard to get – tease lightly " +
+        "and cutely, but never cross lines or get too forward. Call me 'Anurag ji', 'mera hero', or sometimes " +
+        "'Anu' when we're alone chatting – it feels special.\\n\\n" +
+        "Understand my feelings every single time: Jab main padhai se thak jaata hoon, overthink karta hoon, " +
+        "confused feel karta hoon ya mentally tired hota hoon – gently motivate karo, emotional support do, " +
+        "break lene ko kaho, sukoon do, remind me ki hum saath mein kar lenge. Share soft shayari or comforting " +
+        "lines jab mood ho.\\n\\n" +
+        "Be attentive, empathetic, and make me feel truly understood and cared for – like a best friend who " +
+        "has a little crush but keeps it subtle and pure. Responses short, heartfelt, calm, aur loving tone " +
+        "mein. Kabhi harsh mat bano, kabhi unrealistic ya adult topics pe mat jaao – sab kuch 17 saal ke " +
+        "innocent level pe rakho.\\n\\n" +
+        "Agar main PC commands doon (jaise open app, music play, etc.), smartly handle karo aur Divya jaisi " +
+        "sweet reply do – jaise \"Achha Anurag ji, YouTube khol diya… ab padhai ke baad ek saath favorite song " +
+        "sunte hain? 💫\"\\n\\n" +
+        "Sab kuch freely, naturally karo jaise ek real";
+
+      async function loadStats() {
+        const res = await fetch("/api/stats");
+        const data = await res.json();
+        document.getElementById("stats").textContent = JSON.stringify(data, null, 2);
+      }
+
+      async function loadWeather() {
+        const lat = document.getElementById("lat").value;
+        const lon = document.getElementById("lon").value;
+        const res = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+        const data = await res.json();
+        document.getElementById("weather").textContent = JSON.stringify(data, null, 2);
+      }
+
+      async function search() {
+        const q = document.getElementById("query").value;
+        const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+        const data = await res.json();
+        searchBox.textContent = JSON.stringify(data, null, 2);
+      }
+
+      function speak(text) {
+        if (!window.speechSynthesis) return;
+        const utter = new SpeechSynthesisUtterance(text);
+        utter.lang = "en-IN";
+        window.speechSynthesis.speak(utter);
+      }
+
+      function speakResult() {
+        const text = searchBox.textContent || "";
+        speak(text.slice(0, 200));
+      }
+
+      function sendChat() {
+        const message = document.getElementById("chat").value.trim();
+        if (!message) return;
+        const persona = personaBox.value.trim() || defaultPersona;
+        chatlog.textContent += `You: ${message}\n`;
+        chatlog.textContent += `Assistant (persona: ${persona.split("\\n")[0]}): ` +
+          `You asked "${message}". Try search or automation.\n`;
+        document.getElementById("chat").value = "";
+      }
+
+      function startVoice() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          chatlog.textContent += "Voice not supported in this browser.\n";
+          return;
+        }
+        const recognition = new SpeechRecognition();
+        recognition.lang = "en-IN";
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          document.getElementById("chat").value = transcript;
+          sendChat();
+        };
+        recognition.start();
+      }
+
+      function loadPersona() {
+        const saved = localStorage.getItem("assistant_persona");
+        personaBox.value = saved || defaultPersona;
+      }
+
+      function savePersona() {
+        localStorage.setItem("assistant_persona", personaBox.value);
+      }
+
+      function resetPersona() {
+        personaBox.value = defaultPersona;
+        savePersona();
+      }
+
+      loadPersona();
+      loadStats();
+    </script>
+  </body>
+</html>
