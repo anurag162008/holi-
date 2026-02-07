@@ -21,6 +21,14 @@ class JarvisUI:
         self.speech = SpeechEngine(config)
         self.root = tk.Tk()
         self.root.title("Jarvis Desktop Assistant")
+        self.provider_var = tk.StringVar(value=self.config.llm_provider)
+        self.ollama_host_var = tk.StringVar(value=self.config.ollama_host)
+        self.gemini_key_var = tk.StringVar(value=self.config.gemini_api_key or "")
+        self.openrouter_key_var = tk.StringVar(value=self.config.openrouter_api_key or "")
+        self.openrouter_model_var = tk.StringVar(value=self.config.openrouter_model)
+        self.hf_key_var = tk.StringVar(value=self.config.hf_api_key or "")
+        self.hf_model_var = tk.StringVar(value=self.config.hf_model)
+        self.auto_speak_var = tk.BooleanVar(value=self.config.auto_speak)
 
         self.chat_log = scrolledtext.ScrolledText(self.root, height=18, width=80)
         self.chat_log.pack(padx=12, pady=8)
@@ -36,6 +44,62 @@ class JarvisUI:
 
         memory_button = tk.Button(self.root, text="Select Memory Folder", command=self.select_memory_folder)
         memory_button.pack(padx=4, pady=4, side=tk.LEFT)
+
+        settings_frame = tk.LabelFrame(self.root, text="Settings")
+        settings_frame.pack(padx=12, pady=8, fill=tk.X)
+
+        provider_row = tk.Frame(settings_frame)
+        provider_row.pack(fill=tk.X, padx=6, pady=4)
+        tk.Label(provider_row, text="LLM Provider").pack(side=tk.LEFT)
+        provider_menu = tk.OptionMenu(
+            provider_row,
+            self.provider_var,
+            "auto",
+            "ollama",
+            "gemini",
+            "openrouter",
+            "huggingface",
+        )
+        provider_menu.pack(side=tk.LEFT, padx=6)
+
+        ollama_row = tk.Frame(settings_frame)
+        ollama_row.pack(fill=tk.X, padx=6, pady=4)
+        tk.Label(ollama_row, text="Ollama Host").pack(side=tk.LEFT)
+        tk.Entry(ollama_row, textvariable=self.ollama_host_var, width=50).pack(side=tk.LEFT, padx=6)
+
+        gemini_row = tk.Frame(settings_frame)
+        gemini_row.pack(fill=tk.X, padx=6, pady=4)
+        tk.Label(gemini_row, text="Gemini API Key").pack(side=tk.LEFT)
+        tk.Entry(gemini_row, textvariable=self.gemini_key_var, width=50, show="*").pack(side=tk.LEFT, padx=6)
+
+        openrouter_row = tk.Frame(settings_frame)
+        openrouter_row.pack(fill=tk.X, padx=6, pady=4)
+        tk.Label(openrouter_row, text="OpenRouter API Key").pack(side=tk.LEFT)
+        tk.Entry(openrouter_row, textvariable=self.openrouter_key_var, width=50, show="*").pack(
+            side=tk.LEFT, padx=6
+        )
+
+        openrouter_model_row = tk.Frame(settings_frame)
+        openrouter_model_row.pack(fill=tk.X, padx=6, pady=4)
+        tk.Label(openrouter_model_row, text="OpenRouter Model").pack(side=tk.LEFT)
+        tk.Entry(openrouter_model_row, textvariable=self.openrouter_model_var, width=50).pack(side=tk.LEFT, padx=6)
+
+        hf_row = tk.Frame(settings_frame)
+        hf_row.pack(fill=tk.X, padx=6, pady=4)
+        tk.Label(hf_row, text="HF API Key").pack(side=tk.LEFT)
+        tk.Entry(hf_row, textvariable=self.hf_key_var, width=50, show="*").pack(side=tk.LEFT, padx=6)
+
+        hf_model_row = tk.Frame(settings_frame)
+        hf_model_row.pack(fill=tk.X, padx=6, pady=4)
+        tk.Label(hf_model_row, text="HF Model").pack(side=tk.LEFT)
+        tk.Entry(hf_model_row, textvariable=self.hf_model_var, width=50).pack(side=tk.LEFT, padx=6)
+
+        auto_speak_row = tk.Frame(settings_frame)
+        auto_speak_row.pack(fill=tk.X, padx=6, pady=4)
+        tk.Checkbutton(auto_speak_row, text="Auto speak replies", variable=self.auto_speak_var).pack(
+            side=tk.LEFT
+        )
+        tk.Button(auto_speak_row, text="Save Settings", command=self.save_settings).pack(side=tk.LEFT, padx=8)
 
     def select_memory_folder(self) -> None:
         folder = filedialog.askdirectory()
@@ -154,10 +218,26 @@ class JarvisUI:
             self.memory.remember_style(user_text)
 
     def _maybe_speak(self, response: str) -> None:
+        if not self.config.auto_speak:
+            return
         try:
             self.speech.speak(response)
         except Exception:  # noqa: BLE001
             return
+
+    def save_settings(self) -> None:
+        self.config.llm_provider = self.provider_var.get() or "auto"
+        self.config.ollama_host = self.ollama_host_var.get().strip() or self.config.ollama_host
+        gemini_key = self.gemini_key_var.get().strip()
+        self.config.gemini_api_key = gemini_key or None
+        openrouter_key = self.openrouter_key_var.get().strip()
+        self.config.openrouter_api_key = openrouter_key or None
+        self.config.openrouter_model = self.openrouter_model_var.get().strip() or self.config.openrouter_model
+        hf_key = self.hf_key_var.get().strip()
+        self.config.hf_api_key = hf_key or None
+        self.config.hf_model = self.hf_model_var.get().strip() or self.config.hf_model
+        self.config.auto_speak = bool(self.auto_speak_var.get())
+        messagebox.showinfo("Settings", "Settings saved for this session.")
 
     def _extract_number(self, text: str) -> int | None:
         parts = [item for item in text.split() if item.isdigit()]

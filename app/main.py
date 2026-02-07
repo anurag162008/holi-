@@ -1,5 +1,9 @@
+import base64
+import importlib.util
 import json
 import os
+import shutil
+import tempfile
 from datetime import datetime
 from typing import Any
 
@@ -7,13 +11,16 @@ import psutil
 import requests
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
+import subprocess
 
-try:
-    import pyautogui  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
-    pyautogui = None
+from app.llm import DEFAULT_SYSTEM_PROMPT, LLMRouter
+
+pyautogui = None
+if importlib.util.find_spec("pyautogui") is not None:
+    import pyautogui as pyautogui  # type: ignore
 
 app = FastAPI(title="Jarvis Assistant")
+router = LLMRouter()
 
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 WEB_DIR = os.path.join(BASE_DIR, "web")
@@ -58,6 +65,12 @@ def fetch_search(q: str) -> dict[str, Any]:
         "answer": data.get("Answer"),
         "related": [item.get("Text") for item in data.get("RelatedTopics", []) if item.get("Text")],
     }
+
+
+def build_system_prompt(persona: str) -> str:
+    if not persona:
+        return DEFAULT_SYSTEM_PROMPT
+    return f"{DEFAULT_SYSTEM_PROMPT}\nPersona: {persona}"
 
 
 def normalize_memory_path(path: str) -> str:
@@ -174,10 +187,14 @@ def chat(payload: dict[str, Any]) -> dict[str, Any]:
             )
         return {"reply": reply, "data": {"search": search_payload, "persona": persona}}
 
-    reply = (
-        "I'm here to help! You can ask for system stats, weather, or say 'search <topic>'. "
-        "I can also run automation if it's enabled."
-    )
+    system_prompt = build_system_prompt(persona)
+    try:
+        reply = router.generate(message, system_prompt=system_prompt, need_reasoning=True)
+    except RuntimeError:
+        reply = (
+            "I'm having trouble reaching the AI provider right now. "
+            "Please check your provider settings or try again later."
+        )
     if memory_root:
         timestamp = datetime.utcnow().isoformat()
         append_memory(
@@ -235,10 +252,49 @@ def command(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 @app.post("/api/transcribe")
-def transcribe() -> dict[str, str]:
-    raise HTTPException(status_code=501, detail="STT not wired yet")
+def transcribe(payload: dict[str, Any]) -> dict[str, str]:
+    if importlib.util.find_spec("whisper") is None:
+        raise HTTPException(status_code=501, detail="Whisper is not installed")
+    import whisper  # type: ignore
+    audio_base64 = str(payload.get("audio_base64", "")).strip()
+    if not audio_base64:
+        raise HTTPException(status_code=400, detail="audio_base64 is required")
+    if audio_base64.startswith("data:"):
+        audio_base64 = audio_base64.split(",", 1)[-1]
+    filename = str(payload.get("filename", "audio.wav"))
+    suffix = os.path.splitext(filename)[1] or ".wav"
+    try:
+        audio_bytes = base64.b64decode(audio_base64)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="audio_base64 must be valid base64") from exc
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
+        handle.write(audio_bytes)
+        temp_path = handle.name
+    model = whisper.load_model(os.getenv("WHISPER_MODEL", "base"))
+    result: dict[str, Any] = model.transcribe(temp_path)
+    os.unlink(temp_path)
+    return {"text": result.get("text", "").strip()}
 
 
 @app.post("/api/speak")
-def speak() -> dict[str, str]:
-    raise HTTPException(status_code=501, detail="TTS not wired yet")
+def speak(payload: dict[str, Any]) -> dict[str, str]:
+    text = str(payload.get("text", "")).strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="text is required")
+    voice = os.getenv("PIPER_VOICE", "en_US-amy-low")
+    if not shutil.which("piper"):
+        raise HTTPException(status_code=501, detail="piper is not installed")
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as handle:
+        output_path = handle.name
+    process = subprocess.run(
+        ["piper", "--model", voice, "--output_file", output_path],
+        input=text.encode("utf-8"),
+        check=False,
+    )
+    if process.returncode != 0:
+        os.unlink(output_path)
+        raise HTTPException(status_code=500, detail="piper failed to synthesize audio")
+    with open(output_path, "rb") as handle:
+        audio_bytes = handle.read()
+    os.unlink(output_path)
+    return {"audio_base64": base64.b64encode(audio_bytes).decode("utf-8")}
