@@ -121,7 +121,34 @@
           <button onclick="sendChat()">Send</button>
           <button class="secondary" onclick="startVoice()">Start Voice</button>
         </div>
+        <label class="row">
+          <input type="checkbox" id="autoSpeakChat" />
+          <span class="muted">Auto speak chat replies</span>
+        </label>
         <pre id="chatlog" class="log"></pre>
+      </div>
+
+      <div class="card">
+        <h2>Automation (your PC only)</h2>
+        <p class="muted">Requires ENABLE_AUTOMATION=1 and pyautogui installed on the server.</p>
+        <div class="row">
+          <input id="automationText" placeholder="Text to type..." />
+          <button onclick="typeText()">Type</button>
+        </div>
+        <div class="row">
+          <input id="automationKeys" placeholder="Press keys (e.g. ctrl+k or enter)" />
+          <button onclick="pressKeys()">Press</button>
+        </div>
+        <div class="row">
+          <input id="automationX" placeholder="Click X" />
+          <input id="automationY" placeholder="Click Y" />
+          <button onclick="clickAt()">Click</button>
+        </div>
+        <label class="row">
+          <input type="checkbox" id="automationConfirm" />
+          <span class="muted">I confirm this runs on my own device</span>
+        </label>
+        <pre id="automationLog" class="log"></pre>
       </div>
     </div>
 
@@ -131,6 +158,8 @@
       const personaBox = document.getElementById("persona");
       const memoryPathBox = document.getElementById("memoryPath");
       const memoryLog = document.getElementById("memoryLog");
+      const autoSpeakChat = document.getElementById("autoSpeakChat");
+      const automationLog = document.getElementById("automationLog");
       const defaultPersona =
         "You are Divya, my sweet classmate and close friend from 11th grade. You are 17 years old, " +
         "studying in the same class as me, preparing for JEE just like Anurag ji. You speak in a soft, " +
@@ -207,6 +236,9 @@
           .then((res) => res.json())
           .then((data) => {
             chatlog.textContent += `Assistant: ${data.reply}\n`;
+            if (autoSpeakChat.checked) {
+              speak(data.reply || "");
+            }
           })
           .catch(() => {
             chatlog.textContent += "Assistant: Sorry, something went wrong.\n";
@@ -266,8 +298,68 @@
         savePersona();
       }
 
+      function loadAutoSpeak() {
+        autoSpeakChat.checked = localStorage.getItem("auto_speak_chat") === "1";
+      }
+
+      autoSpeakChat.addEventListener("change", () => {
+        localStorage.setItem("auto_speak_chat", autoSpeakChat.checked ? "1" : "0");
+      });
+
+      function automationPayload(action, extra) {
+        return Object.assign(
+          {
+            action,
+            confirm: document.getElementById("automationConfirm").checked
+          },
+          extra
+        );
+      }
+
+      function handleAutomationResponse(res) {
+        return res
+          .json()
+          .then((data) => {
+            automationLog.textContent = JSON.stringify(data, null, 2);
+          })
+          .catch(() => {
+            automationLog.textContent = "Automation failed.";
+          });
+      }
+
+      function typeText() {
+        const text = document.getElementById("automationText").value;
+        fetch("/api/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(automationPayload("type_text", { text }))
+        }).then(handleAutomationResponse);
+      }
+
+      function pressKeys() {
+        const raw = document.getElementById("automationKeys").value.trim();
+        if (!raw) return;
+        const keys = raw.includes(",") ? raw.split(",").map((k) => k.trim()).filter(Boolean) : raw;
+        fetch("/api/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(automationPayload("press", { keys }))
+        }).then(handleAutomationResponse);
+      }
+
+      function clickAt() {
+        const x = Number(document.getElementById("automationX").value);
+        const y = Number(document.getElementById("automationY").value);
+        fetch("/api/command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(automationPayload("click", { x, y }))
+        }).then(handleAutomationResponse);
+      }
+
       loadPersona();
       loadMemoryPath();
+      loadAutoSpeak();
       loadStats();
     </script>
   </body>

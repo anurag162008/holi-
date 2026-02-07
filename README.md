@@ -81,6 +81,7 @@ The desktop app automatically tries providers in this order:
 Set environment variables to enable providers:
 
 ```bash
+set LLM_PROVIDER=auto
 set GEMINI_API_KEY=your_key
 set OPENROUTER_API_KEY=your_key
 set HF_API_KEY=your_key
@@ -89,10 +90,14 @@ set HF_API_KEY=your_key
 On Linux/macOS:
 
 ```bash
+export LLM_PROVIDER=auto
 export GEMINI_API_KEY=your_key
 export OPENROUTER_API_KEY=your_key
 export HF_API_KEY=your_key
 ```
+
+You can force a specific provider for the web app by setting `LLM_PROVIDER` to
+`ollama`, `gemini`, `openrouter`, or `huggingface`.
 
 ---
 
@@ -101,6 +106,7 @@ export HF_API_KEY=your_key
 ### Voice + Chat (single app)
 - Uses **Web Speech API** in the browser for voice input.
 - Uses browser **TTS** for voice output.
+- Chat replies are routed through optional LLM providers (Ollama/Gemini/OpenRouter/HF).
 - Persona prompt is **editable in the UI** and saved in the browser.
 
 ### System stats
@@ -171,6 +177,9 @@ Supported actions:
 - `GET /api/weather?lat=..&lon=..`
 - `GET /api/search?q=..`
 - `POST /api/command` (automation)
+- You can trigger automation from the web UI when `ENABLE_AUTOMATION=1` and `pyautogui` are available.
+- `POST /api/transcribe` (optional Whisper STT, expects `audio_base64`)
+- `POST /api/speak` (optional Piper TTS)
 
 ---
 
@@ -180,7 +189,7 @@ If you want a more advanced build (offline STT/TTS, multi‑agent, memory, etc.)
 
 - Wire Whisper.cpp / Vosk for offline STT
 - Wire Piper for offline TTS
-- Add a real LLM back‑end and tool routing
+- Add more tool routing (desktop automation, scheduling, reminders)
 - Add RustDesk/VNC setup guide for remote desktop
 
 ---
