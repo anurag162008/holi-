@@ -105,6 +105,13 @@
           <button onclick="savePersona()">Save Persona</button>
           <button class="secondary" onclick="resetPersona()">Reset</button>
         </div>
+        <label class="muted">Memory Folder (shared across Windows/Linux)</label>
+        <input id="memoryPath" placeholder="e.g. C:\\JarvisMemory or /home/user/jarvis" />
+        <div class="row">
+          <button class="secondary" onclick="saveMemoryPath()">Save Memory Path</button>
+          <button class="secondary" onclick="loadMemory()">Load Memory</button>
+        </div>
+        <pre id="memoryLog" class="log"></pre>
       </div>
 
       <div class="card">
@@ -122,6 +129,8 @@
       const chatlog = document.getElementById("chatlog");
       const searchBox = document.getElementById("search");
       const personaBox = document.getElementById("persona");
+      const memoryPathBox = document.getElementById("memoryPath");
+      const memoryLog = document.getElementById("memoryLog");
       const defaultPersona =
         "You are Divya, my sweet classmate and close friend from 11th grade. You are 17 years old, " +
         "studying in the same class as me, preparing for JEE just like Anurag ji. You speak in a soft, " +
@@ -180,10 +189,31 @@
         const message = document.getElementById("chat").value.trim();
         if (!message) return;
         const persona = personaBox.value.trim() || defaultPersona;
+        const lat = document.getElementById("lat").value;
+        const lon = document.getElementById("lon").value;
+        const memoryPath = memoryPathBox.value.trim();
         chatlog.textContent += `You: ${message}\n`;
-        chatlog.textContent += `Assistant (persona: ${persona.split("\\n")[0]}): ` +
-          `You asked "${message}". Try search or automation.\n`;
-        document.getElementById("chat").value = "";
+        fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            persona,
+            lat,
+            lon,
+            memory_path: memoryPath
+          })
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            chatlog.textContent += `Assistant: ${data.reply}\n`;
+          })
+          .catch(() => {
+            chatlog.textContent += "Assistant: Sorry, something went wrong.\n";
+          })
+          .finally(() => {
+            document.getElementById("chat").value = "";
+          });
       }
 
       function startVoice() {
@@ -211,12 +241,33 @@
         localStorage.setItem("assistant_persona", personaBox.value);
       }
 
+      function loadMemoryPath() {
+        const saved = localStorage.getItem("assistant_memory_path");
+        memoryPathBox.value = saved || "";
+      }
+
+      function saveMemoryPath() {
+        localStorage.setItem("assistant_memory_path", memoryPathBox.value.trim());
+      }
+
+      async function loadMemory() {
+        const memoryPath = memoryPathBox.value.trim();
+        if (!memoryPath) {
+          memoryLog.textContent = "Please set a memory folder path first.";
+          return;
+        }
+        const res = await fetch(`/api/memory?path=${encodeURIComponent(memoryPath)}`);
+        const data = await res.json();
+        memoryLog.textContent = JSON.stringify(data.entries, null, 2);
+      }
+
       function resetPersona() {
         personaBox.value = defaultPersona;
         savePersona();
       }
 
       loadPersona();
+      loadMemoryPath();
       loadStats();
     </script>
   </body>
