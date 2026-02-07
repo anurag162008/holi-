@@ -12,13 +12,24 @@ class LLMRouter:
     def __init__(self, config: AppConfig) -> None:
         self.config = config
 
+    def select_provider_chain(self, need_reasoning: bool, need_realtime: bool) -> list[str]:
+        online = self._is_online()
+        if not online:
+            return ["ollama"]
+        if need_realtime:
+            return ["gemini", "openrouter", "huggingface", "ollama"]
+        if need_reasoning:
+            return ["ollama", "openrouter", "gemini", "huggingface"]
+        return ["ollama", "gemini", "openrouter", "huggingface"]
+
     def generate(self, prompt: str, need_reasoning: bool = False, need_realtime: bool = False) -> str:
-        provider_chain = [
-            self._try_ollama,
-            self._try_gemini,
-            self._try_openrouter,
-            self._try_huggingface,
-        ]
+        provider_map = {
+            "ollama": self._try_ollama,
+            "gemini": self._try_gemini,
+            "openrouter": self._try_openrouter,
+            "huggingface": self._try_huggingface,
+        }
+        provider_chain = [provider_map[key] for key in self.select_provider_chain(need_reasoning, need_realtime)]
         last_error = None
         for provider in provider_chain:
             try:
@@ -90,6 +101,13 @@ class LLMRouter:
         if isinstance(data, dict) and "generated_text" in data:
             return data["generated_text"]
         return None
+
+    def _is_online(self) -> bool:
+        try:
+            response = requests.get("https://api.duckduckgo.com/", params={"q": "ping", "format": "json"}, timeout=3)
+            return response.status_code < 400
+        except requests.RequestException:
+            return False
 
 
 def is_module_available(module_name: str) -> bool:
